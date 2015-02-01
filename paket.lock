@@ -3,6 +3,7 @@ NUGET
   specs:
     FAKE (3.12.2)
     FSharp.Compiler.Service (0.0.67)
+    FSharp.Core (3.1.2.1)
     FSharp.Formatting (2.4.37)
       FSharp.Compiler.Service (0.0.67)
       Microsoft.AspNet.Razor (2.0.30506)

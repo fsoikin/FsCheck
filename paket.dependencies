@@ -10,3 +10,4 @@ nuget NuGet.CommandLine
 nuget SourceLink.Fake
 nuget FSharp.Formatting
 nuget xunit.runner.visualstudio
+nuget FSharp.Core
