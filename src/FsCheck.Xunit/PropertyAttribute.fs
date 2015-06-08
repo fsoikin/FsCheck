@@ -47,6 +47,7 @@ type PropertyAttribute() =
     let mutable verbose = false
     let mutable quietOnSuccess = false
     let mutable arbitrary = Config.Default.Arbitrary |> List.toArray
+
     ///If set, the seed to use to start testing. Allows reproduction of previous runs. You can just paste
     ///the tuple from the output window, e.g. 12344,12312 or (123,123).
     member x.Replay with get() = match replay with None -> String.Empty | Some (Random.StdGen (x,y)) -> sprintf "%A" (x,y)
@@ -69,7 +70,7 @@ type PropertyAttribute() =
     member x.Verbose with get() = verbose and set(v) = verbose <- v
     ///The Arbitrary instances to use for this test method. The Arbitrary instances 
     ///are merged in back to front order i.e. instances for the same generated type 
-    //at the front of the array will override those at the back.
+    ///at the front of the array will override those at the back.
     member x.Arbitrary with get() = arbitrary and set(v) = arbitrary <- v    
     ///If set, suppresses the output from the test if the test is successful. This can be useful when running tests
     ///with TestDriven.net, because TestDriven.net pops up the Output window in Visual Studio if a test fails; thus,
@@ -79,18 +80,43 @@ type PropertyAttribute() =
     ///test failures.
     member x.QuietOnSuccess with get() = quietOnSuccess and set(v) = quietOnSuccess <- v
 
+    member this.discoverArbitraries (methodInfo: IMethodInfo) =
+        let arbitrariesFromParameters =
+            let hasStaticArbMethod (t: Type) = 
+                t.GetMethods( Reflection.BindingFlags.Static ||| Reflection.BindingFlags.Public )
+                |> Seq.exists (fun m -> m.ReturnType.IsGenericType && m.ReturnType.GetGenericTypeDefinition() = typedefof<Arbitrary<_>>)
+
+            let unwrapType (t: Type) =
+                if t.IsArray then t.GetElementType()
+                else if 
+                    t.IsGenericType && 
+                    typeof<System.Collections.IEnumerable>.IsAssignableFrom( t ) &&
+                    t.GenericTypeArguments.Length = 1
+                    then t.GenericTypeArguments.[0]
+                else t
+
+            methodInfo.MethodInfo.GetParameters() 
+            |> Seq.map (fun p -> unwrapType p.ParameterType)
+            |> Seq.filter (fun t -> not <| t.Namespace.StartsWith( "System.") ) // Heuristic to cut off system types
+            |> Seq.filter hasStaticArbMethod
+
+        let arbitrariesFromDeclaringType =
+            methodInfo.Class.Type 
+            |> Seq.unfold (fun t -> if t <> null then Some(t,t.DeclaringType) else None)
+            |> Seq.map (fun t -> t.GetCustomAttributes(typeof<ArbitraryAttribute>, true))
+            |> Seq.filter (fun attr -> attr.Length = 1)
+            |> Seq.collect (fun attr -> (attr.[0] :?> ArbitraryAttribute).Arbitrary)
+
+        arbitrariesFromDeclaringType
+        |> Seq.append this.Arbitrary
+        |> Seq.append arbitrariesFromParameters
+        |> Seq.toList
+
     override this.EnumerateTestCommands(methodInfo:IMethodInfo) :seq<ITestCommand> = 
         { new TestCommand(methodInfo, null, 0) with
             override x.Execute(testClass:obj) : MethodResult = 
                 let xunitRunner = XunitRunner()
-                let arbitraries = 
-                    methodInfo.Class.Type 
-                    |> Seq.unfold (fun t -> if t <> null then Some(t,t.DeclaringType) else None)
-                    |> Seq.map (fun t -> t.GetCustomAttributes(typeof<ArbitraryAttribute>, true))
-                    |> Seq.filter (fun attr -> attr.Length = 1)
-                    |> Seq.collect (fun attr -> (attr.[0] :?> ArbitraryAttribute).Arbitrary)
-                    |> Seq.append this.Arbitrary
-                    |> Seq.toList
+
                 let config = 
                     {Config.Default with
                         Replay = this.ReplayStdGen
@@ -100,7 +126,7 @@ type PropertyAttribute() =
                         EndSize = this.EndSize
                         Every = if this.Verbose then Config.Verbose.Every else Config.Quick.Every
                         EveryShrink = if this.Verbose then Config.Verbose.EveryShrink else Config.Quick.EveryShrink
-                        Arbitrary = arbitraries
+                        Arbitrary = this.discoverArbitraries methodInfo
                         Runner = xunitRunner
                     }
                 Check.Method(config, methodInfo.MethodInfo,?target=if testClass <> null then Some testClass else None)

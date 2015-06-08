@@ -37,6 +37,8 @@ Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "FsCheck.NUnit", "src\FsChec
 EndProject
 Project("{4925A630-B079-445d-BCD4-3A9C94FE9307}") = "FsCheck.NUnit.Addin", "src\FsCheck.NUnit.Addin\FsCheck.NUnit.Addin.fsproj", "{BF24DE38-C529-4638-BE50-A937EA3E6876}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "FsCheck.CS.Test", "tests\FsCheck.CS.Test\FsCheck.CS.Test.csproj", "{47C30E3A-4E89-45E9-84A1-116F9DC1CEF4}"
+EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Docs", "Docs", "{6B36173B-D4E0-4CF4-840D-3F3016653F85}"
 	ProjectSection(SolutionItems) = preProject
 		Docs\content\index.fsx = Docs\content\index.fsx
